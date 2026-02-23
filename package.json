@@ -1,0 +1,25 @@
+{
+  "name": "tradex-perp-program",
+  "version": "1.0.0",
+  "description": "TradeX Solana Perpetual Futures Program",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "./scripts/build.sh",
+    "build:no-test": "./scripts/build.sh --no-test",
+    "test": "SBF_OUT_DIR=$(pwd)/target/deploy cargo test",
+    "deploy": "./scripts/deploy.sh",
+    "deploy:fresh": "./scripts/deploy-fresh.sh",
+    "deploy:mainnet": "./scripts/deploy.sh mainnet",
+    "deploy:fresh:mainnet": "./scripts/deploy-fresh.sh mainnet",
+    "init-exchange": "bun run scripts/init-exchange.ts",
+    "status": "bun run scripts/status.ts",
+    "transfer-admin": "bun run scripts/transfer-admin.ts"
+  },
+  "dependencies": {
+    "@solana/web3.js": "^1.98.4"
+  },
+  "devDependencies": {
+    "@types/bun": "latest"
+  }
+}
