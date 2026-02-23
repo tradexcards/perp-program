@@ -37,3 +37,6 @@ npm-debug.log*
 # Misc
 *.bak
 *.tmp
+
+node_modules/
+dist/
