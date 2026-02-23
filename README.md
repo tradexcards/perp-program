@@ -2,12 +2,11 @@
 
 A high-performance Solana on-chain perpetual futures exchange for Pokemon card prices. Built with [Pinocchio](https://github.com/anza-xyz/pinocchio) for zero-copy, no-allocation performance.
 
-## Program Addresses
+## Program Address
 
 | Network     | Program ID                                     |
 | ----------- | ---------------------------------------------- |
-| **Mainnet** | `8hH5CWo14R5QhaFUuXpxJytchS6NgrhRLHASyVeriEvN` |
-| Devnet      | `AzYLMDPsNDvzb8ShhVzNWBVv6k9ogCKpqdjWMhnkATdz` |
+| **Mainnet** | `TRDXCHHWWZdQXxkGFJxek1KU2hn19687xztNBy99Ca1` |
 
 ## Overview
 
