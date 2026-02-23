@@ -1,0 +1,39 @@
+# Build artifacts
+/target/
+*.so
+*.dylib
+*.dll
+
+# Cargo
+Cargo.lock
+!Cargo.lock
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Solana
+test-ledger/
+*.keypair.json
+keypair.json
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Logs
+*.log
+npm-debug.log*
+
+# Misc
+*.bak
+*.tmp
