@@ -12,9 +12,9 @@
     "deploy:fresh": "./scripts/deploy-fresh.sh",
     "deploy:mainnet": "./scripts/deploy.sh mainnet",
     "deploy:fresh:mainnet": "./scripts/deploy-fresh.sh mainnet",
-    "init-exchange": "bun run scripts/init-exchange.ts",
-    "status": "bun run scripts/status.ts",
-    "transfer-admin": "bun run scripts/transfer-admin.ts"
+    "init-exchange": "bun --env-file=../.env run scripts/init-exchange.ts",
+    "status": "bun --env-file=../.env run scripts/status.ts",
+    "transfer-admin": "bun --env-file=../.env run scripts/transfer-admin.ts"
   },
   "dependencies": {
     "@solana/web3.js": "^1.98.4"
