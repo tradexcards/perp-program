@@ -996,7 +996,10 @@ pub fn process_open_position(
             .ok_or(PerpDexError::MathOverflow)?;
         // M-01: Decrease total_deposits when user balance is reduced by total_cost,
         // so withdraw_fees can correctly compute available protocol revenue.
-        exchange.total_deposits = exchange.total_deposits.saturating_sub(total_cost);
+        exchange.total_deposits = exchange
+            .total_deposits
+            .checked_sub(total_cost)
+            .ok_or(PerpDexError::MathOverflow)?;
     }
 
     Ok(())
@@ -1195,7 +1198,9 @@ pub fn process_close_position(
                 .balance
                 .checked_add(transfer_amount)
                 .ok_or(PerpDexError::MathOverflow)?;
-            total_user_credit += transfer_amount;
+            total_user_credit = total_user_credit
+                .checked_add(transfer_amount)
+                .ok_or(PerpDexError::MathOverflow)?;
         }
         // L-01: Use actual transfer_amount (not shortfall) for bookkeeping,
         // since the transfer is capped by insurance token balance.
