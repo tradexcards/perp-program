@@ -959,6 +959,9 @@ pub fn process_open_position(
             .total_volume
             .checked_add(size as u128)
             .ok_or(PerpDexError::MathOverflow)?;
+        // M-01: Decrease total_deposits when user balance is reduced by total_cost,
+        // so withdraw_fees can correctly compute available protocol revenue.
+        exchange.total_deposits = exchange.total_deposits.saturating_sub(total_cost);
     }
 
     Ok(())
@@ -1076,6 +1079,8 @@ pub fn process_close_position(
     let vault_balance = read_token_amount(ctx.vault)?;
     let actual_payout = payout.min(vault_balance);
     let shortfall = payout.saturating_sub(actual_payout);
+    // M-01: Track total credit to user balance for total_deposits update
+    let mut total_user_credit = actual_payout;
 
     // Update user_account
     {
@@ -1151,6 +1156,7 @@ pub fn process_close_position(
                 .balance
                 .checked_add(transfer_amount)
                 .ok_or(PerpDexError::MathOverflow)?;
+            total_user_credit += transfer_amount;
         }
         // L-01: Use actual transfer_amount (not shortfall) for bookkeeping,
         // since the transfer is capped by insurance token balance.
@@ -1188,6 +1194,12 @@ pub fn process_close_position(
         exchange.total_volume = exchange
             .total_volume
             .checked_add(pos_size as u128)
+            .ok_or(PerpDexError::MathOverflow)?;
+        // M-01: Increase total_deposits when user balance is credited,
+        // so withdraw_fees correctly reflects vault obligations to users.
+        exchange.total_deposits = exchange
+            .total_deposits
+            .checked_add(total_user_credit)
             .ok_or(PerpDexError::MathOverflow)?;
     }
 
