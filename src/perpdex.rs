@@ -240,6 +240,11 @@ pub fn process_initialize_exchange(
 ) -> ProgramResult {
     let ctx = InitializeExchangeAccounts::parse(program_id, accounts)?;
 
+    // M-04: Only the bootstrap authority can initialize the exchange
+    if *ctx.admin.address().as_array() != BOOTSTRAP_AUTHORITY {
+        return Err(PerpDexError::Unauthorized.into());
+    }
+
     // ── Create exchange_state PDA ────────────────────────────────────────
     let (exchange_pda, exchange_bump) = find_pda(program_id, &[EXCHANGE_SEED])?;
     if exchange_pda != *ctx.exchange_state.address() {

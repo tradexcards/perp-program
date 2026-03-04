@@ -54,6 +54,11 @@ instruction_accounts! {
 pub fn process_initialize_oracle(program_id: &Address, accounts: &[AccountView]) -> ProgramResult {
     let ctx = InitializeOracleAccounts::parse(program_id, accounts)?;
 
+    // M-04: Only the bootstrap authority can initialize the oracle
+    if *ctx.authority.address().as_array() != BOOTSTRAP_AUTHORITY {
+        return Err(PerpDexError::Unauthorized.into());
+    }
+
     // ── Create oracle_state PDA ──────────────────────────────────────────
     let (oracle_pda, oracle_bump) = find_pda(program_id, &[ORACLE_SEED])?;
     if oracle_pda != *ctx.oracle_state.address() {
