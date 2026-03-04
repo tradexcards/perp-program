@@ -37,6 +37,9 @@ pub enum PerpDexError {
 
     // L-04: Token mint mismatch
     MintMismatch = 6041,
+
+    // L-05: Position already exists
+    PositionAlreadyExists = 6042,
 }
 
 impl From<PerpDexError> for ProgramError {

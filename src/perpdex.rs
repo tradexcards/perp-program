@@ -893,6 +893,12 @@ pub fn process_open_position(
     }
 
     // ── Create position PDA ──────────────────────────────────────────────
+    // L-05: Check position doesn't already exist to prevent overwriting
+    // an active position's data with a new one.
+    if !ctx.position.is_data_empty() {
+        return Err(PerpDexError::PositionAlreadyExists.into());
+    }
+
     let owner_key = ctx.owner.address().as_ref();
     let product_id_bytes = product_id.to_le_bytes();
     let (position_pda, position_bump) =
