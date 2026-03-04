@@ -1,6 +1,6 @@
 use pinocchio::cpi::Seed;
 use pinocchio::{account::AccountView, cpi::Signer, error::ProgramError, Address, ProgramResult};
-use pinocchio_system::instructions::CreateAccount;
+// M-03: PDA creation uses create_pda_account from helpers (resilient to prefunding DoS)
 
 use crate::constants::*;
 use crate::error::PerpDexError;
@@ -64,14 +64,14 @@ pub fn process_initialize_oracle(program_id: &Address, accounts: &[AccountView])
     let oracle_seeds: [Seed; 2] = [Seed::from(ORACLE_SEED), Seed::from(&oracle_bump_seed)];
     let oracle_signer = Signer::from(&oracle_seeds);
 
-    CreateAccount {
-        from: ctx.authority,
-        to: ctx.oracle_state,
-        lamports: rent_exempt_minimum(OracleState::ACCOUNT_SIZE),
-        space: OracleState::ACCOUNT_SIZE as u64,
-        owner: program_id,
-    }
-    .invoke_signed(&[oracle_signer])?;
+    create_pda_account(
+        ctx.authority,
+        ctx.oracle_state,
+        rent_exempt_minimum(OracleState::ACCOUNT_SIZE),
+        OracleState::ACCOUNT_SIZE as u64,
+        program_id,
+        &[oracle_signer],
+    )?;
 
     // ── Init oracle_state ────────────────────────────────────────────────
     {

@@ -6,7 +6,7 @@ use pinocchio::{
     sysvars::{clock::Clock, Sysvar},
     Address, ProgramResult,
 };
-use pinocchio_system::instructions::CreateAccount;
+// M-03: PDA creation uses create_pda_account from helpers (resilient to prefunding DoS)
 
 use crate::constants::*;
 use crate::error::PerpDexError;
@@ -250,14 +250,14 @@ pub fn process_initialize_exchange(
     let exchange_seeds: [Seed; 2] = [Seed::from(EXCHANGE_SEED), Seed::from(&exchange_bump_seed)];
     let exchange_signer = Signer::from(&exchange_seeds);
 
-    CreateAccount {
-        from: ctx.admin,
-        to: ctx.exchange_state,
-        lamports: rent_exempt_minimum(ExchangeState::ACCOUNT_SIZE),
-        space: ExchangeState::ACCOUNT_SIZE as u64,
-        owner: program_id,
-    }
-    .invoke_signed(&[exchange_signer])?;
+    create_pda_account(
+        ctx.admin,
+        ctx.exchange_state,
+        rent_exempt_minimum(ExchangeState::ACCOUNT_SIZE),
+        ExchangeState::ACCOUNT_SIZE as u64,
+        program_id,
+        &[exchange_signer],
+    )?;
 
     // ── Create vault token account PDA ──────────────────────────────────
     let (vault_pda, vault_bump) = find_pda(program_id, &[VAULT_SEED])?;
@@ -269,14 +269,14 @@ pub fn process_initialize_exchange(
     let vault_seeds: [Seed; 2] = [Seed::from(VAULT_SEED), Seed::from(&vault_bump_seed)];
     let vault_signer = Signer::from(&vault_seeds);
 
-    CreateAccount {
-        from: ctx.admin,
-        to: ctx.vault,
-        lamports: rent_exempt_minimum(165),
-        space: 165,
-        owner: &Address::from(TOKEN_PROGRAM_ID),
-    }
-    .invoke_signed(&[vault_signer])?;
+    create_pda_account(
+        ctx.admin,
+        ctx.vault,
+        rent_exempt_minimum(165),
+        165,
+        &Address::from(TOKEN_PROGRAM_ID),
+        &[vault_signer],
+    )?;
 
     // Initialize the vault as a token account
     initialize_token_account(
@@ -297,14 +297,14 @@ pub fn process_initialize_exchange(
     let insurance_seeds: [Seed; 2] = [Seed::from(INSURANCE_SEED), Seed::from(&insurance_bump_seed)];
     let insurance_signer = Signer::from(&insurance_seeds);
 
-    CreateAccount {
-        from: ctx.admin,
-        to: ctx.insurance_fund,
-        lamports: rent_exempt_minimum(165),
-        space: 165,
-        owner: &Address::from(TOKEN_PROGRAM_ID),
-    }
-    .invoke_signed(&[insurance_signer])?;
+    create_pda_account(
+        ctx.admin,
+        ctx.insurance_fund,
+        rent_exempt_minimum(165),
+        165,
+        &Address::from(TOKEN_PROGRAM_ID),
+        &[insurance_signer],
+    )?;
 
     initialize_token_account(
         ctx.token_program,
@@ -389,14 +389,14 @@ pub fn process_create_market(
     ];
     let market_signer = Signer::from(&market_seeds);
 
-    CreateAccount {
-        from: ctx.admin,
-        to: ctx.market,
-        lamports: rent_exempt_minimum(Market::ACCOUNT_SIZE),
-        space: Market::ACCOUNT_SIZE as u64,
-        owner: program_id,
-    }
-    .invoke_signed(&[market_signer])?;
+    create_pda_account(
+        ctx.admin,
+        ctx.market,
+        rent_exempt_minimum(Market::ACCOUNT_SIZE),
+        Market::ACCOUNT_SIZE as u64,
+        program_id,
+        &[market_signer],
+    )?;
 
     // ── Init market data ─────────────────────────────────────────────────
     {
@@ -465,14 +465,14 @@ pub fn process_create_market_permissionless(
     ];
     let market_signer = Signer::from(&market_seeds);
 
-    CreateAccount {
-        from: ctx.payer,
-        to: ctx.market,
-        lamports: rent_exempt_minimum(Market::ACCOUNT_SIZE),
-        space: Market::ACCOUNT_SIZE as u64,
-        owner: program_id,
-    }
-    .invoke_signed(&[market_signer])?;
+    create_pda_account(
+        ctx.payer,
+        ctx.market,
+        rent_exempt_minimum(Market::ACCOUNT_SIZE),
+        Market::ACCOUNT_SIZE as u64,
+        program_id,
+        &[market_signer],
+    )?;
 
     // ── Init market data ─────────────────────────────────────────────────
     {
@@ -528,14 +528,14 @@ pub fn process_create_user_account(
     ];
     let ua_signer = Signer::from(&ua_seeds);
 
-    CreateAccount {
-        from: ctx.owner,
-        to: ctx.user_account,
-        lamports: rent_exempt_minimum(UserAccount::ACCOUNT_SIZE),
-        space: UserAccount::ACCOUNT_SIZE as u64,
-        owner: program_id,
-    }
-    .invoke_signed(&[ua_signer])?;
+    create_pda_account(
+        ctx.owner,
+        ctx.user_account,
+        rent_exempt_minimum(UserAccount::ACCOUNT_SIZE),
+        UserAccount::ACCOUNT_SIZE as u64,
+        program_id,
+        &[ua_signer],
+    )?;
 
     // ── Init user_account data ───────────────────────────────────────────
     {
@@ -883,14 +883,14 @@ pub fn process_open_position(
     ];
     let position_signer = Signer::from(&position_seeds);
 
-    CreateAccount {
-        from: ctx.owner,
-        to: ctx.position,
-        lamports: rent_exempt_minimum(Position::ACCOUNT_SIZE),
-        space: Position::ACCOUNT_SIZE as u64,
-        owner: program_id,
-    }
-    .invoke_signed(&[position_signer])?;
+    create_pda_account(
+        ctx.owner,
+        ctx.position,
+        rent_exempt_minimum(Position::ACCOUNT_SIZE),
+        Position::ACCOUNT_SIZE as u64,
+        program_id,
+        &[position_signer],
+    )?;
 
     // ── Init position data ───────────────────────────────────────────────
     let liq_price = calculate_liquidation_price(oracle_price, leverage, side)?;

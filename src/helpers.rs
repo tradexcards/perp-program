@@ -1,9 +1,11 @@
 use pinocchio::{
     account::AccountView,
+    cpi::Signer,
     error::ProgramError,
     sysvars::{clock::Clock, instructions::Instructions, Sysvar},
-    Address,
+    Address, ProgramResult,
 };
+use pinocchio_system::instructions::{Allocate, Assign, CreateAccount, Transfer};
 
 use crate::constants::*;
 use crate::error::PerpDexError;
@@ -81,6 +83,45 @@ pub fn find_pda(program_id: &Address, seeds: &[&[u8]]) -> Result<(Address, u8), 
         }
     }
     Err(ProgramError::InvalidArgument)
+}
+
+/// M-03: Create a PDA account, resilient to prefunding DoS attacks.
+/// If the target account already has lamports (prefunded by attacker),
+/// falls back to Allocate + Assign + Transfer instead of CreateAccount,
+/// which would fail on a prefunded account.
+pub fn create_pda_account<'a>(
+    from: &'a AccountView,
+    to: &'a AccountView,
+    lamports: u64,
+    space: u64,
+    owner: &Address,
+    signers: &[Signer],
+) -> ProgramResult {
+    let existing = to.lamports();
+    if existing > 0 {
+        // Account was prefunded — CreateAccount would fail, use fallback
+        Allocate { account: to, space }.invoke_signed(signers)?;
+        Assign { account: to, owner }.invoke_signed(signers)?;
+        let needed = lamports.saturating_sub(existing);
+        if needed > 0 {
+            Transfer {
+                from,
+                to,
+                lamports: needed,
+            }
+            .invoke()?;
+        }
+    } else {
+        CreateAccount {
+            from,
+            to,
+            lamports,
+            space,
+            owner,
+        }
+        .invoke_signed(signers)?;
+    }
+    Ok(())
 }
 
 // ── Oracle helpers ───────────────────────────────────────────────────────────
