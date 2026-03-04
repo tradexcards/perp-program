@@ -1091,6 +1091,17 @@ pub fn process_close_position(
         return Err(PerpDexError::Unauthorized.into());
     }
 
+    // L-05 (PDF): Verify user_account belongs to the closing signer.
+    // Without this, an attacker could supply another user's UserAccount,
+    // corrupting their open_position_count and potentially locking their positions.
+    {
+        let data = ctx.user_account.try_borrow()?;
+        let ua = UserAccount::load(&data)?;
+        if ua.owner != *ctx.owner.address().as_array() {
+            return Err(PerpDexError::Unauthorized.into());
+        }
+    }
+
     // Calculate PnL, funding, fee
     let pnl = calculate_pnl(pos_entry_price, oracle_price, pos_size, pos_side)?;
     let current_cumulative = match pos_side {
