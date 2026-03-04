@@ -1122,11 +1122,11 @@ pub fn process_close_position(
                     &signer_seeds,
                 )?;
             }
+            // L-01: Use actual transfer_amount (not loss_beyond_margin) for bookkeeping,
+            // since the transfer is capped by insurance token balance.
             let mut data = ctx.exchange_state.try_borrow_mut()?;
             let exchange = ExchangeState::load_mut(&mut data)?;
-            exchange.insurance_balance = exchange
-                .insurance_balance
-                .saturating_sub(loss_beyond_margin);
+            exchange.insurance_balance = exchange.insurance_balance.saturating_sub(transfer_amount);
         }
     }
 
@@ -1152,9 +1152,11 @@ pub fn process_close_position(
                 .checked_add(transfer_amount)
                 .ok_or(PerpDexError::MathOverflow)?;
         }
+        // L-01: Use actual transfer_amount (not shortfall) for bookkeeping,
+        // since the transfer is capped by insurance token balance.
         let mut data = ctx.exchange_state.try_borrow_mut()?;
         let exchange = ExchangeState::load_mut(&mut data)?;
-        exchange.insurance_balance = exchange.insurance_balance.saturating_sub(shortfall);
+        exchange.insurance_balance = exchange.insurance_balance.saturating_sub(transfer_amount);
     }
 
     // Update market OI
@@ -1442,20 +1444,23 @@ pub fn process_liquidate(
 
     // Transfer insurance fee: vault -> insurance_fund (best-effort — cap to vault balance
     // so liquidations don't revert when vault is nearly empty)
-    if insurance_fee > 0 {
+    let capped_fee = if insurance_fee > 0 {
         let vault_balance = read_token_amount(ctx.vault)?;
-        let capped_fee = insurance_fee.min(vault_balance);
-        if capped_fee > 0 {
+        let cf = insurance_fee.min(vault_balance);
+        if cf > 0 {
             token_transfer_pda_signed(
                 ctx.token_program,
                 ctx.vault,
                 ctx.insurance_fund,
                 ctx.exchange_state,
-                capped_fee,
+                cf,
                 &signer_seeds,
             )?;
         }
-    }
+        cf
+    } else {
+        0
+    };
 
     // Transfer bad debt: insurance_fund -> vault
     let bad_debt_transferred: u64 = if effective_margin < 0 {
@@ -1472,7 +1477,9 @@ pub fn process_liquidate(
                 &signer_seeds,
             )?;
         }
-        bad_debt
+        // L-01: Return actual transfer_amount, not bad_debt, since transfer is capped
+        // by insurance token balance.
+        transfer_amount
     } else {
         0
     };
@@ -1481,9 +1488,11 @@ pub fn process_liquidate(
     {
         let mut data = ctx.exchange_state.try_borrow_mut()?;
         let exchange = ExchangeState::load_mut(&mut data)?;
+        // L-01: Use capped_fee (actual transferred) instead of insurance_fee,
+        // since the vault->insurance transfer is capped by vault balance.
         exchange.insurance_balance = exchange
             .insurance_balance
-            .checked_add(insurance_fee)
+            .checked_add(capped_fee)
             .ok_or(PerpDexError::MathOverflow)?;
         if bad_debt_transferred > 0 {
             exchange.insurance_balance = exchange
@@ -1688,20 +1697,23 @@ pub fn process_liquidate_keeper(
 
     // Transfer insurance fee: vault -> insurance_fund (best-effort — cap to vault balance
     // so liquidations don't revert when vault is nearly empty)
-    if insurance_fee > 0 {
+    let capped_fee = if insurance_fee > 0 {
         let vault_balance = read_token_amount(ctx.vault)?;
-        let capped_fee = insurance_fee.min(vault_balance);
-        if capped_fee > 0 {
+        let cf = insurance_fee.min(vault_balance);
+        if cf > 0 {
             token_transfer_pda_signed(
                 ctx.token_program,
                 ctx.vault,
                 ctx.insurance_fund,
                 ctx.exchange_state,
-                capped_fee,
+                cf,
                 &signer_seeds,
             )?;
         }
-    }
+        cf
+    } else {
+        0
+    };
 
     // Transfer bad debt: insurance_fund -> vault
     let bad_debt_transferred: u64 = if effective_margin < 0 {
@@ -1718,7 +1730,9 @@ pub fn process_liquidate_keeper(
                 &signer_seeds,
             )?;
         }
-        bad_debt
+        // L-01: Return actual transfer_amount, not bad_debt, since transfer is capped
+        // by insurance token balance.
+        transfer_amount
     } else {
         0
     };
@@ -1727,9 +1741,11 @@ pub fn process_liquidate_keeper(
     {
         let mut data = ctx.exchange_state.try_borrow_mut()?;
         let exchange = ExchangeState::load_mut(&mut data)?;
+        // L-01: Use capped_fee (actual transferred) instead of insurance_fee,
+        // since the vault->insurance transfer is capped by vault balance.
         exchange.insurance_balance = exchange
             .insurance_balance
-            .checked_add(insurance_fee)
+            .checked_add(capped_fee)
             .ok_or(PerpDexError::MathOverflow)?;
         if bad_debt_transferred > 0 {
             exchange.insurance_balance = exchange
