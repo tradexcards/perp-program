@@ -227,6 +227,16 @@ instruction_accounts! {
     }
 }
 
+// M-05: MigrateMarket: market, exchange_state, admin, system_program
+instruction_accounts! {
+    pub struct MigrateMarketAccounts<'a> {
+        pub market:          account_mut,
+        pub exchange_state:  pda(EXCHANGE_SEED),
+        pub admin:           signer_mut,
+        pub system_program:  program,
+    }
+}
+
 // ══════════════════════════════════════════════════════════════════════════════
 // Instruction handlers
 // ══════════════════════════════════════════════════════════════════════════════
@@ -811,6 +821,10 @@ pub fn process_open_position(
         market_max_leverage = market.max_leverage;
         cum_funding_long = market.cumulative_funding_rate_long;
         cum_funding_short = market.cumulative_funding_rate_short;
+        // M-05: Check oracle price deviation against last stored price
+        let last_price = Market::last_oracle_price(&data);
+        let max_dev = Market::max_price_deviation_bps(&data);
+        check_price_deviation(price, last_price, max_dev)?;
     }
 
     if leverage == 0 || leverage > market_max_leverage {
@@ -950,6 +964,8 @@ pub fn process_open_position(
             .total_volume
             .checked_add(size as u128)
             .ok_or(PerpDexError::MathOverflow)?;
+        // M-05: Update last oracle price for deviation tracking
+        Market::set_last_oracle_price(&mut data, oracle_price);
     }
 
     // ── Update exchange stats ────────────────────────────────────────────
@@ -1014,6 +1030,10 @@ pub fn process_close_position(
         let market = Market::load(&data)?;
         cum_funding_long = market.cumulative_funding_rate_long;
         cum_funding_short = market.cumulative_funding_rate_short;
+        // M-05: Check oracle price deviation against last stored price
+        let last_price = Market::last_oracle_price(&data);
+        let max_dev = Market::max_price_deviation_bps(&data);
+        check_price_deviation(price, last_price, max_dev)?;
     }
 
     // Verify Ed25519-signed oracle price
@@ -1186,6 +1206,8 @@ pub fn process_close_position(
             .total_volume
             .checked_add(pos_size as u128)
             .ok_or(PerpDexError::MathOverflow)?;
+        // M-05: Update last oracle price for deviation tracking
+        Market::set_last_oracle_price(&mut data, oracle_price);
     }
 
     // Update exchange stats
@@ -1339,6 +1361,10 @@ pub fn process_liquidate(
         let market = Market::load(&data)?;
         cum_funding_long = market.cumulative_funding_rate_long;
         cum_funding_short = market.cumulative_funding_rate_short;
+        // M-05: Check oracle price deviation against last stored price
+        let last_price = Market::last_oracle_price(&data);
+        let max_dev = Market::max_price_deviation_bps(&data);
+        check_price_deviation(price, last_price, max_dev)?;
     }
 
     // Verify Ed25519-signed oracle price
@@ -1635,6 +1661,10 @@ pub fn process_liquidate_keeper(
         let market = Market::load(&data)?;
         cum_funding_long = market.cumulative_funding_rate_long;
         cum_funding_short = market.cumulative_funding_rate_short;
+        // M-05: Check oracle price deviation against last stored price
+        let last_price = Market::last_oracle_price(&data);
+        let max_dev = Market::max_price_deviation_bps(&data);
+        check_price_deviation(price, last_price, max_dev)?;
     }
 
     // Verify Ed25519-signed oracle price
@@ -2186,6 +2216,66 @@ pub fn process_withdraw_fees(
         let mut data = ctx.exchange_state.try_borrow_mut()?;
         let exchange = ExchangeState::load_mut(&mut data)?;
         exchange.total_fees_collected = exchange.total_fees_collected.saturating_sub(amount);
+    }
+
+    Ok(())
+}
+
+// ── 20. Migrate Market (M-05) ───────────────────────────────────────────────
+
+/// Migrate a legacy market account (113 bytes) to the extended layout (129 bytes).
+/// Adds last_oracle_price and max_price_deviation_bps fields.
+#[inline(never)]
+pub fn process_migrate_market(
+    program_id: &Address,
+    accounts: &[AccountView],
+    product_id: u32,
+    max_price_deviation_bps: u64,
+) -> ProgramResult {
+    let ctx = MigrateMarketAccounts::parse(program_id, accounts)?;
+
+    // Verify admin
+    {
+        let data = ctx.exchange_state.try_borrow()?;
+        let exchange = ExchangeState::load(&data)?;
+        if exchange.admin != *ctx.admin.address().as_array() {
+            return Err(PerpDexError::Unauthorized.into());
+        }
+    }
+
+    // Verify market product_id matches and is at legacy size
+    {
+        let data = ctx.market.try_borrow()?;
+        let market = Market::load(&data)?;
+        if market.product_id != product_id {
+            return Err(PerpDexError::ProductMismatch.into());
+        }
+        if data.len() >= Market::EXTENDED_ACCOUNT_SIZE {
+            // Already migrated
+            return Ok(());
+        }
+    }
+
+    // Resize account from 113 to 129 bytes
+    ctx.market.resize(Market::EXTENDED_ACCOUNT_SIZE)?;
+
+    // Transfer additional rent from admin to market account
+    let additional_rent = crate::oracle::rent_exempt_minimum(Market::EXTENDED_ACCOUNT_SIZE - 8)
+        .saturating_sub(crate::oracle::rent_exempt_minimum(Market::SIZE));
+    if additional_rent > 0 {
+        pinocchio_system::instructions::Transfer {
+            from: ctx.admin,
+            to: ctx.market,
+            lamports: additional_rent,
+        }
+        .invoke()?;
+    }
+
+    // Initialize extension fields
+    {
+        let mut data = ctx.market.try_borrow_mut()?;
+        Market::set_last_oracle_price(&mut data, 0); // Will be set on first trade
+        Market::set_max_price_deviation_bps(&mut data, max_price_deviation_bps);
     }
 
     Ok(())

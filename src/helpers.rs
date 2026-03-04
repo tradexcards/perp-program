@@ -124,6 +124,36 @@ pub fn create_pda_account<'a>(
     Ok(())
 }
 
+// ── Price deviation check ────────────────────────────────────────────────────
+
+/// M-05: Check that the current oracle price doesn't deviate too far from the
+/// last stored oracle price. Returns Ok if deviation check is disabled
+/// (max_deviation_bps == 0) or if there's no previous price (last_price == 0).
+pub fn check_price_deviation(
+    current_price: u64,
+    last_price: u64,
+    max_deviation_bps: u64,
+) -> Result<(), ProgramError> {
+    if max_deviation_bps == 0 || last_price == 0 {
+        return Ok(()); // Check disabled or no reference price
+    }
+    let diff = if current_price > last_price {
+        current_price - last_price
+    } else {
+        last_price - current_price
+    };
+    // deviation_bps = diff * BPS_DENOMINATOR / last_price
+    let deviation_bps = diff
+        .checked_mul(BPS_DENOMINATOR)
+        .ok_or(PerpDexError::MathOverflow)?
+        .checked_div(last_price)
+        .ok_or(PerpDexError::MathOverflow)?;
+    if deviation_bps > max_deviation_bps {
+        return Err(PerpDexError::PriceDeviationExceeded.into());
+    }
+    Ok(())
+}
+
 // ── Oracle helpers ───────────────────────────────────────────────────────────
 
 /// Verify an Ed25519-signed oracle price from the Instructions sysvar.

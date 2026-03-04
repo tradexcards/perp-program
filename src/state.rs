@@ -142,7 +142,13 @@ impl ExchangeState {
     }
 }
 
-// ── Market (105 bytes data, 113 on-chain) ────────────────────────────────────
+// ── Market (105 bytes core, extended to 121 bytes with M-05 fields) ──────────
+//
+// On-chain sizes:
+//   Legacy:   113 bytes (8 disc + 105 core)
+//   Extended: 129 bytes (8 disc + 105 core + 8 last_oracle_price + 8 max_price_deviation_bps)
+//
+// load/load_mut accept both sizes for backward compatibility.
 
 #[repr(C, packed)]
 pub struct Market {
@@ -161,9 +167,15 @@ pub struct Market {
 
 impl Market {
     pub const SIZE: usize = core::mem::size_of::<Self>(); // 105
-    pub const ACCOUNT_SIZE: usize = 8 + Self::SIZE; // 113
+    pub const ACCOUNT_SIZE: usize = 8 + Self::SIZE; // 113 (legacy)
+    pub const EXTENDED_ACCOUNT_SIZE: usize = Self::ACCOUNT_SIZE + 16; // 129
+
+    // Extension field offsets (relative to start of account data)
+    const EXT_LAST_ORACLE_PRICE: usize = Self::ACCOUNT_SIZE; // byte 113
+    const EXT_MAX_DEVIATION_BPS: usize = Self::ACCOUNT_SIZE + 8; // byte 121
 
     pub fn load(data: &[u8]) -> Result<&Self, ProgramError> {
+        // Accept both legacy (113) and extended (129) sizes
         if data.len() < Self::ACCOUNT_SIZE {
             return Err(ProgramError::AccountDataTooSmall);
         }
@@ -174,6 +186,7 @@ impl Market {
     }
 
     pub fn load_mut(data: &mut [u8]) -> Result<&mut Self, ProgramError> {
+        // Accept both legacy (113) and extended (129) sizes
         if data.len() < Self::ACCOUNT_SIZE {
             return Err(ProgramError::AccountDataTooSmall);
         }
@@ -194,6 +207,48 @@ impl Market {
 
     pub fn is_active(&self) -> bool {
         self.active != 0
+    }
+
+    /// M-05: Read last_oracle_price from extension data. Returns 0 for legacy accounts.
+    pub fn last_oracle_price(data: &[u8]) -> u64 {
+        if data.len() >= Self::EXTENDED_ACCOUNT_SIZE {
+            u64::from_le_bytes(
+                data[Self::EXT_LAST_ORACLE_PRICE..Self::EXT_LAST_ORACLE_PRICE + 8]
+                    .try_into()
+                    .unwrap(),
+            )
+        } else {
+            0
+        }
+    }
+
+    /// M-05: Read max_price_deviation_bps from extension data. Returns 0 for legacy accounts (disabled).
+    pub fn max_price_deviation_bps(data: &[u8]) -> u64 {
+        if data.len() >= Self::EXTENDED_ACCOUNT_SIZE {
+            u64::from_le_bytes(
+                data[Self::EXT_MAX_DEVIATION_BPS..Self::EXT_MAX_DEVIATION_BPS + 8]
+                    .try_into()
+                    .unwrap(),
+            )
+        } else {
+            0
+        }
+    }
+
+    /// M-05: Write last_oracle_price to extension data. No-op for legacy accounts.
+    pub fn set_last_oracle_price(data: &mut [u8], price: u64) {
+        if data.len() >= Self::EXTENDED_ACCOUNT_SIZE {
+            data[Self::EXT_LAST_ORACLE_PRICE..Self::EXT_LAST_ORACLE_PRICE + 8]
+                .copy_from_slice(&price.to_le_bytes());
+        }
+    }
+
+    /// M-05: Write max_price_deviation_bps to extension data. No-op for legacy accounts.
+    pub fn set_max_price_deviation_bps(data: &mut [u8], bps: u64) {
+        if data.len() >= Self::EXTENDED_ACCOUNT_SIZE {
+            data[Self::EXT_MAX_DEVIATION_BPS..Self::EXT_MAX_DEVIATION_BPS + 8]
+                .copy_from_slice(&bps.to_le_bytes());
+        }
     }
 }
 

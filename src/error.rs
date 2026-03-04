@@ -31,6 +31,9 @@ pub enum PerpDexError {
     // Ed25519 signed price errors
     InvalidEd25519Instruction = 6035,
     InvalidSignedPrice = 6036,
+
+    // M-05: Price deviation circuit breaker
+    PriceDeviationExceeded = 6040,
 }
 
 impl From<PerpDexError> for ProgramError {

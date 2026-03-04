@@ -47,6 +47,8 @@ const DISC_TRANSFER_ADMIN: [u8; 8] = [0x2a, 0xf2, 0x42, 0x6a, 0xe4, 0x0a, 0x6f, 
 const DISC_ACCEPT_ADMIN: [u8; 8] = [0x70, 0x2a, 0x2d, 0x5a, 0x74, 0xb5, 0x0d, 0xaa];
 const DISC_WITHDRAW_FEES: [u8; 8] = [0xc6, 0xd4, 0xab, 0x6d, 0x90, 0xd7, 0xae, 0x59];
 const DISC_LIQUIDATE_KEEPER: [u8; 8] = [0xc5, 0x66, 0x9e, 0x95, 0xca, 0xd8, 0x49, 0x36];
+// M-05: Market migration for price deviation circuit breaker
+const DISC_MIGRATE_MARKET: [u8; 8] = [0xc9, 0x71, 0xb5, 0x78, 0xd9, 0x3c, 0x6d, 0xcb];
 
 fn process_instruction(
     program_id: &pinocchio::Address,
@@ -202,6 +204,21 @@ fn process_instruction(
             let price = helpers::read_u64(&data[4..])?;
             let timestamp = helpers::read_i64(&data[12..])?;
             perpdex::process_liquidate_keeper(program_id, accounts, product_id, price, timestamp)
+        }
+
+        // M-05: migrate_market data: [product_id:4][max_price_deviation_bps:8] = 12 bytes
+        DISC_MIGRATE_MARKET => {
+            if data.len() < 12 {
+                return Err(ProgramError::InvalidInstructionData);
+            }
+            let product_id = helpers::read_u32(data)?;
+            let max_price_deviation_bps = helpers::read_u64(&data[4..])?;
+            perpdex::process_migrate_market(
+                program_id,
+                accounts,
+                product_id,
+                max_price_deviation_bps,
+            )
         }
 
         _ => Err(ProgramError::InvalidInstructionData),
