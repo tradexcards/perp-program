@@ -209,8 +209,9 @@ pub fn verify_signed_price(
     // Parse the Instructions sysvar and scan for Ed25519 precompile
     let instructions = Instructions::try_from(instructions_sysvar)?;
 
-    // Scan up to 8 instructions (ComputeBudget + Ed25519 + our ix, typically 3-4)
-    let max_scan: usize = 8;
+    // L-06: Scan up to 16 instructions to handle wallets that inject many
+    // ComputeBudget / priority-fee / memo instructions before ours.
+    let max_scan: usize = 16;
     let mut found = false;
 
     for idx in 0..max_scan {
@@ -268,7 +269,10 @@ pub fn verify_signed_price(
             continue;
         }
         if &ix_data[msg_offset..msg_offset + msg_size] != &expected_msg {
-            return Err(PerpDexError::InvalidSignedPrice.into());
+            // L-06: Message doesn't match — this may be a valid Ed25519 ix for a
+            // different purpose (e.g. different product_id). Continue scanning
+            // instead of failing closed.
+            continue;
         }
 
         // All checks passed — Ed25519 instruction is valid
