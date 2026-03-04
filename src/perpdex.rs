@@ -728,6 +728,14 @@ pub fn process_withdraw(
         if token_owner != *ctx.owner.address().as_array() {
             return Err(PerpDexError::InvalidTokenAccountOwner.into());
         }
+        // L-04: Verify user_token_account mint matches USDC to prevent
+        // withdrawing to a token account with the wrong mint.
+        let token_mint = read_token_mint(ctx.user_token_account)?;
+        let exchange_data = ctx.exchange_state.try_borrow()?;
+        let exchange = ExchangeState::load(&exchange_data)?;
+        if token_mint != exchange.usdc_mint {
+            return Err(PerpDexError::MintMismatch.into());
+        }
     }
 
     // Verify and update user_account

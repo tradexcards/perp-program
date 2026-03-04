@@ -34,6 +34,9 @@ pub enum PerpDexError {
 
     // M-05: Price deviation circuit breaker
     PriceDeviationExceeded = 6040,
+
+    // L-04: Token mint mismatch
+    MintMismatch = 6041,
 }
 
 impl From<PerpDexError> for ProgramError {
