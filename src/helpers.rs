@@ -409,6 +409,9 @@ pub fn calculate_liquidation_price_from_margin(
 }
 
 /// Calculate funding payment owed.
+///
+/// L-03 (PDF): Accumulators now store rates at BPS_DENOMINATOR precision
+/// (not divided down). Divide by BPS_DENOMINATOR² to get the actual payment.
 pub fn calculate_funding_payment(
     entry_funding_rate: i64,
     current_cumulative_rate: i64,
@@ -417,10 +420,13 @@ pub fn calculate_funding_payment(
     let rate_diff = current_cumulative_rate
         .checked_sub(entry_funding_rate)
         .ok_or(PerpDexError::MathOverflow)?;
+    let precision = (BPS_DENOMINATOR as i128)
+        .checked_mul(BPS_DENOMINATOR as i128)
+        .ok_or(PerpDexError::MathOverflow)?;
     let payment = (size as i128)
         .checked_mul(rate_diff as i128)
         .ok_or(PerpDexError::MathOverflow)?
-        .checked_div(BPS_DENOMINATOR as i128)
+        .checked_div(precision)
         .ok_or(PerpDexError::MathOverflow)?;
     if payment < i64::MIN as i128 || payment > i64::MAX as i128 {
         return Err(PerpDexError::MathOverflow.into());

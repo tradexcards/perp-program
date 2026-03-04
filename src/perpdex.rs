@@ -1940,8 +1940,11 @@ pub fn process_update_funding_rate(
             .checked_add(short_oi)
             .ok_or(PerpDexError::MathOverflow)?;
 
-        // M-3: Scale imbalance by BPS_DENOMINATOR before dividing by total_oi
-        // to prevent truncation to 0 for moderate OI imbalances.
+        // L-03 (PDF): Compute funding rate at BPS_DENOMINATOR precision.
+        // Previously the final /BPS_DENOMINATOR cancelled the scaling, truncating
+        // sub-1-bps rates to zero. Now accumulators store rates scaled by
+        // BPS_DENOMINATOR; calculate_funding_payment divides by BPS_DENOMINATOR²
+        // to compensate.
         let funding_rate: i64 = if total_oi == 0 {
             0
         } else {
@@ -1954,11 +1957,13 @@ pub fn process_update_funding_rate(
                 .checked_mul(FUNDING_RATE_CAP_BPS as i128)
                 .ok_or(PerpDexError::MathOverflow)?
                 .checked_div(total_oi as i128)
-                .ok_or(PerpDexError::MathOverflow)?
-                .checked_div(BPS_DENOMINATOR as i128)
                 .ok_or(PerpDexError::MathOverflow)?;
-            rate.max(-FUNDING_RATE_CAP_BPS as i128)
-                .min(FUNDING_RATE_CAP_BPS as i128) as i64
+            // Cap at ±FUNDING_RATE_CAP_BPS * BPS_DENOMINATOR (same economics,
+            // higher internal precision).
+            let cap = (FUNDING_RATE_CAP_BPS as i128)
+                .checked_mul(BPS_DENOMINATOR as i128)
+                .ok_or(PerpDexError::MathOverflow)?;
+            rate.max(-cap).min(cap) as i64
         };
 
         // L-04 (PDF): Scale rate by number of elapsed intervals so that
