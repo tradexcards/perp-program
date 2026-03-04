@@ -438,8 +438,8 @@ MAX_POSITION_SIZE_PER_USER: $100,000
   - Prevents market manipulation
   - Reduces oracle exploitation vectors
 
-MAX_LEVERAGE: 50x
-  - Per-market configurable (default 50x)
+MAX_LEVERAGE: 20x
+  - Per-market configurable (default 20x)
   - Higher leverage = faster liquidation
   - Admin can reduce per-market
 ```

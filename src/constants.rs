@@ -37,7 +37,7 @@ pub const MAX_ORACLE_PRICE_AGE: i64 = 15;
 // ── PerpDex Constants ────────────────────────────────────────────────────────
 
 pub const PRICE_SCALE: u64 = 100_000_000; // 10^8
-pub const MAX_LEVERAGE: u32 = 50;
+pub const MAX_LEVERAGE: u32 = 20;
 pub const MIN_POSITION_SIZE: u64 = 1_000_000; // $1
 pub const MAINTENANCE_MARGIN_BPS: u64 = 100; // 1%
 pub const LIQUIDATION_FEE_BPS: u64 = 50; // 0.5%

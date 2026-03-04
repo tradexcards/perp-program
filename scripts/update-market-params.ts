@@ -102,8 +102,8 @@ async function main() {
     const maxOiUsd = args[1] ? parseInt(args[1], 10) : DEFAULT_MAX_OI_USD;
     const maxOpenInterest = BigInt(maxOiUsd) * BigInt(10 ** USDC_DECIMALS);
 
-    if (maxLeverage < 1 || maxLeverage > 50) {
-        console.error("ERROR: max_leverage must be between 1 and 50");
+    if (maxLeverage < 1 || maxLeverage > 20) {
+        console.error("ERROR: max_leverage must be between 1 and 20");
         process.exit(1);
     }
 

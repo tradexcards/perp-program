@@ -920,13 +920,13 @@ fn fuzz_create_market_leverage_values() {
             reason: "1x leverage",
         },
         LeverageCase {
-            leverage: 50,
+            leverage: 20,
             max_oi: 1_000_000,
             should_succeed: true,
-            reason: "max leverage (50)",
+            reason: "max leverage (20)",
         },
         LeverageCase {
-            leverage: 51,
+            leverage: 21,
             max_oi: 1_000_000,
             should_succeed: false,
             reason: "exceed max leverage",

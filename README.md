@@ -10,7 +10,7 @@ A high-performance Solana on-chain perpetual futures exchange for Pokemon card p
 
 ## Overview
 
-TradeX allows traders to go long or short on Pokemon card prices with up to 50x leverage. The program handles:
+TradeX allows traders to go long or short on Pokemon card prices with up to 20x leverage. The program handles:
 
 - **Oracle price management** with Ed25519 signature verification
 - **Position lifecycle** (open, close, add margin, liquidate)
@@ -111,7 +111,7 @@ Helpers for SPL Token operations: `token_transfer_user_signed()`, `token_transfe
 | Constant                    | Value         | Description                    |
 | --------------------------- | ------------- | ------------------------------ |
 | `PRICE_SCALE`               | 10^8          | 8 decimal price precision      |
-| `MAX_LEVERAGE`              | 50            | Maximum leverage allowed       |
+| `MAX_LEVERAGE`              | 20            | Maximum leverage allowed       |
 | `MIN_POSITION_SIZE`         | 1_000_000     | $1 minimum position            |
 | `MAX_POSITION_SIZE_PER_USER`| 100_000_000_000 | $100k max per user           |
 | `MAINTENANCE_MARGIN_BPS`    | 100           | 1% maintenance margin          |
