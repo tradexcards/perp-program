@@ -1928,6 +1928,13 @@ pub fn process_update_funding_rate(
             return Err(PerpDexError::FundingTooEarly.into());
         }
 
+        // L-04 (PDF): Count how many full intervals were missed.
+        // If the crank was delayed, apply funding for all missed intervals
+        // instead of just one, so positions are charged correctly.
+        let periods = time_elapsed
+            .checked_div(FUNDING_INTERVAL)
+            .ok_or(PerpDexError::MathOverflow)?;
+
         let (long_oi, short_oi) = (market.long_open_interest, market.short_open_interest);
         let total_oi = long_oi
             .checked_add(short_oi)
@@ -1954,15 +1961,34 @@ pub fn process_update_funding_rate(
                 .min(FUNDING_RATE_CAP_BPS as i128) as i64
         };
 
+        // L-04 (PDF): Scale rate by number of elapsed intervals so that
+        // delayed cranks apply the correct total funding amount.
+        let scaled_rate = (funding_rate as i128)
+            .checked_mul(periods as i128)
+            .ok_or(PerpDexError::MathOverflow)?;
+        if scaled_rate < i64::MIN as i128 || scaled_rate > i64::MAX as i128 {
+            return Err(PerpDexError::MathOverflow.into());
+        }
+        let scaled_rate = scaled_rate as i64;
+
         market.cumulative_funding_rate_long = market
             .cumulative_funding_rate_long
-            .checked_add(funding_rate)
+            .checked_add(scaled_rate)
             .ok_or(PerpDexError::MathOverflow)?;
         market.cumulative_funding_rate_short = market
             .cumulative_funding_rate_short
-            .checked_sub(funding_rate)
+            .checked_sub(scaled_rate)
             .ok_or(PerpDexError::MathOverflow)?;
-        market.last_funding_time = clock.unix_timestamp;
+        // L-04 (PDF): Advance by exact number of intervals, not to current
+        // time, so the remaining partial interval is preserved.
+        market.last_funding_time = market
+            .last_funding_time
+            .checked_add(
+                periods
+                    .checked_mul(FUNDING_INTERVAL)
+                    .ok_or(PerpDexError::MathOverflow)?,
+            )
+            .ok_or(PerpDexError::MathOverflow)?;
     }
 
     Ok(())
