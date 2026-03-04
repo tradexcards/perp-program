@@ -14,7 +14,9 @@
     "deploy:fresh:mainnet": "./scripts/deploy-fresh.sh mainnet",
     "init-exchange": "bun --env-file=../.env run scripts/init-exchange.ts",
     "status": "bun --env-file=../.env run scripts/status.ts",
-    "transfer-admin": "bun --env-file=../.env run scripts/transfer-admin.ts"
+    "transfer-admin": "bun --env-file=../.env run scripts/transfer-admin.ts",
+    "migrate-markets": "bun --env-file=../.env run scripts/migrate-markets.ts",
+    "update-market-params": "bun --env-file=../.env run scripts/update-market-params.ts"
   },
   "dependencies": {
     "@solana/web3.js": "^1.98.4"
