@@ -1143,6 +1143,14 @@ pub fn process_close_position(
                 transfer_amount,
                 &signer_seeds,
             )?;
+            // H-01: Re-credit user with the insurance-covered shortfall amount.
+            // Without this, the user loses funds that insurance actually covered.
+            let mut data = ctx.user_account.try_borrow_mut()?;
+            let ua = UserAccount::load_mut(&mut data)?;
+            ua.balance = ua
+                .balance
+                .checked_add(transfer_amount)
+                .ok_or(PerpDexError::MathOverflow)?;
         }
         let mut data = ctx.exchange_state.try_borrow_mut()?;
         let exchange = ExchangeState::load_mut(&mut data)?;
