@@ -1496,7 +1496,7 @@ pub fn process_liquidate(
         0
     };
 
-    // Update exchange insurance balance
+    // Update exchange insurance balance and total_deposits
     {
         let mut data = ctx.exchange_state.try_borrow_mut()?;
         let exchange = ExchangeState::load_mut(&mut data)?;
@@ -1511,6 +1511,13 @@ pub fn process_liquidate(
                 .insurance_balance
                 .saturating_sub(bad_debt_transferred);
         }
+        // M-02: Liquidator fee was credited to liquidator's virtual balance
+        // without updating total_deposits. This inflates withdrawable claims
+        // beyond what the vault accounts for.
+        exchange.total_deposits = exchange
+            .total_deposits
+            .checked_add(liquidator_fee)
+            .ok_or(PerpDexError::MathOverflow)?;
     }
 
     // Update position owner's account
