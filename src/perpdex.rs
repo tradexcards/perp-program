@@ -2283,8 +2283,17 @@ pub fn process_migrate_market(
 
 // ── Close Account Helper ────────────────────────────────────────────────────
 
-/// Close an account: transfer all lamports to the destination and zero the data.
+/// Close an account: zero data, transfer all lamports to destination, reassign owner.
 fn close_account(account: &AccountView, destination: &AccountView) -> ProgramResult {
+    // L-03: Zero account data before closing to prevent stale-data reads.
+    // close() reassigns owner to system program, but zeroing data provides
+    // defense-in-depth against programs that read data without checking owner.
+    {
+        let mut data = account.try_borrow_mut()?;
+        for byte in data.iter_mut() {
+            *byte = 0;
+        }
+    }
     let account_lamports = account.lamports();
     destination.set_lamports(destination.lamports().saturating_add(account_lamports));
     account.set_lamports(0);
