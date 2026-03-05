@@ -1019,11 +1019,16 @@ fn fuzz_add_margin_amounts() {
     mollusk.sysvars.clock.unix_timestamp = 1000;
 
     let pid = program_id();
+    let admin = Pubkey::new_unique();
     let user = Pubkey::new_unique();
+    let usdc_mint = Pubkey::new_unique();
     let product_id: u32 = 1;
 
     let (user_account_pda, _) = find_pda(&[USER_ACCOUNT_SEED, user.as_ref()]);
     let (position_pda, _) = find_pda(&[POSITION_SEED, user.as_ref(), &product_id.to_le_bytes()]);
+    let (exchange_pda, _) = find_pda(&[EXCHANGE_SEED]);
+    let (vault_pda, _) = find_pda(&[VAULT_SEED]);
+    let (insurance_pda, _) = find_pda(&[INSURANCE_SEED]);
 
     let user_balance: u64 = 100_000_000;
     let initial_margin: u64 = 10_000_000;
@@ -1072,12 +1077,17 @@ fn fuzz_add_margin_amounts() {
         ix_data.extend_from_slice(&product_id.to_le_bytes());
         ix_data.extend_from_slice(&tc.amount.to_le_bytes());
 
+        // Set total_deposits to match user balance
+        let mut exchange_data = make_exchange_state(&admin, &usdc_mint, &vault_pda, &insurance_pda);
+        exchange_data[172..180].copy_from_slice(&user_balance.to_le_bytes());
+
         let result = mollusk.process_instruction(
             &Instruction {
                 program_id: pid,
                 accounts: vec![
                     AccountMeta::new(user_account_pda, false),
                     AccountMeta::new(position_pda, false),
+                    AccountMeta::new(exchange_pda, false),
                     AccountMeta::new(user, true),
                 ],
                 data: ix_data,
@@ -1099,6 +1109,7 @@ fn fuzz_add_margin_amounts() {
                         initial_margin,
                     )),
                 ),
+                (exchange_pda, program_owned_account(exchange_data)),
                 (user, system_account(1_000_000_000)),
             ],
         );

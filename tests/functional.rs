@@ -1309,12 +1309,17 @@ fn test_update_funding_rate() {
 fn test_add_margin() {
     let mollusk = setup_mollusk();
     let pid = program_id();
+    let admin = Pubkey::new_unique();
     let owner = Pubkey::new_unique();
+    let usdc_mint = Pubkey::new_unique();
     let product_id: u32 = 1;
     let add_amount: u64 = 500_000; // $0.50
 
     let (user_account_pda, _) = find_pda(&[USER_ACCOUNT_SEED, owner.as_ref()]);
     let (position_pda, _) = find_pda(&[POSITION_SEED, owner.as_ref(), &product_id.to_le_bytes()]);
+    let (exchange_pda, _) = find_pda(&[EXCHANGE_SEED]);
+    let (vault_pda, _) = find_pda(&[VAULT_SEED]);
+    let (insurance_pda, _) = find_pda(&[INSURANCE_SEED]);
 
     let mut ix_data = DISC_ADD_MARGIN.to_vec();
     ix_data.extend_from_slice(&product_id.to_le_bytes());
@@ -1323,9 +1328,9 @@ fn test_add_margin() {
     let ix = Instruction {
         program_id: pid,
         accounts: vec![
-            // Anchor order: user_account, position, owner
             AccountMeta::new(user_account_pda, false),
             AccountMeta::new(position_pda, false),
+            AccountMeta::new(exchange_pda, false),
             AccountMeta::new(owner, true),
         ],
         data: ix_data,
@@ -1333,6 +1338,10 @@ fn test_add_margin() {
 
     let initial_balance: u64 = 10_000_000; // $10
     let initial_margin: u64 = 1_000_000; // $1
+
+    // Set total_deposits to match user balance
+    let mut exchange_data = make_exchange_state(&admin, &usdc_mint, &vault_pda, &insurance_pda);
+    exchange_data[172..180].copy_from_slice(&initial_balance.to_le_bytes());
 
     let accounts: Vec<(Pubkey, Account)> = vec![
         (
@@ -1351,6 +1360,7 @@ fn test_add_margin() {
                 initial_margin,
             )),
         ),
+        (exchange_pda, program_owned_account(exchange_data)),
         (owner, system_account(1_000_000_000)),
     ];
 
@@ -1377,6 +1387,15 @@ fn test_add_margin() {
         .unwrap();
     let new_margin = u64::from_le_bytes(pos.1.data[65..73].try_into().unwrap());
     assert_eq!(new_margin, initial_margin + add_amount);
+
+    // Verify total_deposits decreased
+    let ex = result
+        .resulting_accounts
+        .iter()
+        .find(|(k, _)| *k == exchange_pda)
+        .unwrap();
+    let new_total_deposits = u64::from_le_bytes(ex.1.data[172..180].try_into().unwrap());
+    assert_eq!(new_total_deposits, initial_balance - add_amount);
 }
 
 // ══════════════════════════════════════════════════════════════════════════════

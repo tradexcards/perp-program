@@ -124,11 +124,12 @@ instruction_accounts! {
     }
 }
 
-// AddMargin: user_account, position, owner
+// AddMargin: user_account, position, exchange_state, owner
 instruction_accounts! {
     pub struct AddMarginAccounts<'a> {
         pub user_account:    account_mut,
         pub position:        account_mut,
+        pub exchange_state:  pda_mut(EXCHANGE_SEED),
         pub owner:           signer_mut,
     }
 }
@@ -1319,6 +1320,17 @@ pub fn process_add_margin(
         }
         ua.balance = ua
             .balance
+            .checked_sub(amount)
+            .ok_or(PerpDexError::MathOverflow)?;
+    }
+
+    // M-01: Decrease total_deposits when user balance moves into position margin,
+    // so withdraw_fees guard correctly reflects actual user liabilities.
+    {
+        let mut data = ctx.exchange_state.try_borrow_mut()?;
+        let exchange = ExchangeState::load_mut(&mut data)?;
+        exchange.total_deposits = exchange
+            .total_deposits
             .checked_sub(amount)
             .ok_or(PerpDexError::MathOverflow)?;
     }

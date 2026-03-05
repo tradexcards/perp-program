@@ -1686,12 +1686,15 @@ fn e2e_add_margin_adjusts_liquidation() {
     margin_data.extend_from_slice(&product_id.to_le_bytes());
     margin_data.extend_from_slice(&add_amount.to_le_bytes());
 
+    let exchange_acc = get_account(&result, &exchange_pda);
+
     let result = mollusk.process_instruction(
         &Instruction {
             program_id: pid,
             accounts: vec![
                 AccountMeta::new(user_account_pda, false),
                 AccountMeta::new(position_pda, false),
+                AccountMeta::new(exchange_pda, false),
                 AccountMeta::new(user, true),
             ],
             data: margin_data,
@@ -1699,6 +1702,7 @@ fn e2e_add_margin_adjusts_liquidation() {
         &[
             (user_account_pda, user_account_acc),
             (position_pda, position_acc),
+            (exchange_pda, exchange_acc),
             (user, system_account(1_000_000_000)),
         ],
     );
